@@ -1,0 +1,14 @@
+Descrizione informale in linguaggio naturale dell'elaborato:
+L’applicazione da realizzare, basata su front-end per piattaforma mobile e backend di supporto, deve supportare le attività di
+collaborazione che un insieme di soggetti (nel seguito indicati come “partecipanti”), svolgono per lo sviluppo di progetti.
+I partecipanti si registrano in piattaforma con e-mail e password, sono organizzati in gruppi. Un gruppo deve essere
+identificato almeno da un nome univoco. Un gruppo viene creato da un partecipante che ne diventa proprietario e può
+aggiungere/rimuovere altri partecipanti utilizzando la loro email di registrazione o cancellare il gruppo se vuoto.
+Un partecipante può rimuovere se stesso da un gruppo in cui è stato aggiunto ma non può rimuovere gli altri, se non è proprietario del gruppo.
+Per ogni gruppo viene creata una chat che include i relativi membri ed in cui il proprietario del gruppo è moderatore (può bloccare/sbloccare
+i membri della chat). Nella chat devono poter essere inviati messaggi di testo unicode (che includono quindi anche caratteri associati agli emoticon di sistema).
+E' alresì richiesto di supportare messaggi di tipo immagine a partire dalla photo gallery. Non è richiesta nessuna altra tipologia (link esterni, posizione corrente, o altro).
+Nota:
+Il front-end può essere realizzato in Android mediante SDK o in Flutter.
+Il backend può essere realizzato utilizzando l’API di una piattaforma gestita (Google Firebase) [scelta consigliata per l'elaborato individuale]
+Opzionalmente può realizzata ad-hoc mediante i framework Spring o Vert.X realizzando una adeguata API REST.
