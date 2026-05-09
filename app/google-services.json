@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "694611340435",
+    "project_id": "progetto-computazione",
+    "storage_bucket": "progetto-computazione.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:694611340435:android:bb67a867e73f18ac793166",
+        "android_client_info": {
+          "package_name": "com.example.progettocomputazione"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBFJGelCxJkGb91Nu9tp3p4UsYy5_DMYWc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

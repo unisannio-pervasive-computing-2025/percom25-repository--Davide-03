@@ -1,0 +1,12 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.ProgettoComputazione" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary_modern</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="android:navigationBarColor">@color/surface_modern</item>
+        <item name="android:windowBackground">@color/surface_modern</item>
+        <item name="android:statusBarColor">@color/surface_modern</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+    </style>
+
+    <style name="Theme.ProgettoComputazione" parent="Base.Theme.ProgettoComputazione" />
+</resources>

@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">ProgettoComputazione</string>
+    <string name="welcome_msg">Benvenuto!</string>
+    <string name="email_hint">Email</string>
+    <string name="password_hint">Password</string>
+    <string name="nickname_hint">Nickname</string>
+    <string name="btn_login">Accedi</string>
+    <string name="btn_register">Registrati</string>
+    <string name="btn_goto_register">Non hai un account? Registrati</string>
+    <string name="btn_goto_login">Hai già un account? Accedi</string>
+    <string name="btn_email_link">Invia link di accesso email</string>
+    <string name="err_empty_fields">Riempi tutti i campi</string>
+    <string name="err_email_empty">Inserisci l\'email per ricevere il link</string>
+    <string name="msg_link_sent">Link inviato! Controlla la tua email.</string>
+    <string name="msg_registration_success">Registrazione completata!</string>
+    <string name="msg_login_success">Login effettuato!</string>
+    <string name="msg_link_login_success">Login con link riuscito!</string>
+    <string name="title_register">Crea Account</string>
+</resources>
