@@ -120,12 +120,27 @@ public class GroupRepository {
     }
 
     /**
-     * Elimina definitivamente il documento del gruppo.
+     * Elimina definitivamente il documento del gruppo e tutti i relativi messaggi.
      */
     public void deleteGroup(String groupId, Consumer<String> callback) {
-        db.collection("groups").document(groupId).delete()
-                .addOnSuccessListener(aVoid -> callback.accept("DELETE_SUCCESS"))
-                .addOnFailureListener(e -> callback.accept("Errore: " + e.getMessage()));
+        // Firestore non elimina automaticamente le sottocollezioni quando si elimina il documento padre.
+        // Dobbiamo eliminare manualmente i messaggi.
+        db.collection("groups").document(groupId).collection("messages").get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    // Creazione di un batch per eliminare tutti i messaggi in un'unica operazione atomica
+                    com.google.firebase.firestore.WriteBatch batch = db.batch();
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : queryDocumentSnapshots.getDocuments()) {
+                        batch.delete(doc.getReference());
+                    }
+
+                    // Dopo aver preparato l'eliminazione dei messaggi, aggiungiamo l'eliminazione del gruppo
+                    batch.delete(db.collection("groups").document(groupId));
+
+                    batch.commit()
+                            .addOnSuccessListener(aVoid -> callback.accept("DELETE_SUCCESS"))
+                            .addOnFailureListener(e -> callback.accept("Errore eliminazione: " + e.getMessage()));
+                })
+                .addOnFailureListener(e -> callback.accept("Errore recupero messaggi: " + e.getMessage()));
     }
 
     /**

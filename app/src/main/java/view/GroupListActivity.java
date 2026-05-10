@@ -28,6 +28,10 @@ import model.Group;
 import viewmodel.AuthViewModel;
 import viewmodel.GroupViewModel;
 
+/**
+ * Activity che visualizza la lista dei gruppi di cui l'utente fa parte.
+ * Permette anche la creazione di nuovi gruppi e l'accesso al profilo.
+ */
 public class GroupListActivity extends AppCompatActivity {
 
     private GroupViewModel groupViewModel;
@@ -45,12 +49,14 @@ public class GroupListActivity extends AppCompatActivity {
 
         groupViewModel = new ViewModelProvider(this).get(GroupViewModel.class);
         authViewModel = new ViewModelProvider(this).get(AuthViewModel.class);
+        
         recyclerView = findViewById(R.id.recyclerGroups);
         txtNoGroups = findViewById(R.id.txtNoGroups);
         txtWelcome = findViewById(R.id.txtWelcome);
         ImageButton btnMenu = findViewById(R.id.btnMenu);
         ExtendedFloatingActionButton fabCreateGroup = findViewById(R.id.fabCreateGroup);
 
+        // Monitora il nickname per il messaggio di benvenuto
         authViewModel.getNickname().observe(this, name -> {
             latestNickname = name;
             txtWelcome.setText(getString(R.string.welcome_user, name));
@@ -63,6 +69,7 @@ public class GroupListActivity extends AppCompatActivity {
 
         btnMenu.setOnClickListener(this::showPopupMenu);
 
+        // Osserva gli esiti delle azioni (es. creazione gruppo)
         groupViewModel.getActionStatus().observe(this, status -> {
             if ("SUCCESS".equals(status)) {
                 Toast.makeText(this, R.string.msg_group_created, Toast.LENGTH_SHORT).show();
@@ -77,14 +84,23 @@ public class GroupListActivity extends AppCompatActivity {
                 try {
                     super.onLayoutChildren(recycler, state);
                 } catch (IndexOutOfBoundsException e) {
-                    // Previene il crash "Inconsistency detected"
+                    // Previene il crash "Inconsistency detected" dovuto a bug interni di RecyclerView
                 }
+            }
+
+            @Override
+            public boolean supportsPredictiveItemAnimations() {
+                return false;
             }
         });
         setupAdapter();
+        
         fabCreateGroup.setOnClickListener(v -> showCreateGroupDialog());
     }
 
+    /**
+     * Mostra il menu a comparsa per Profilo e Logout.
+     */
     private void showPopupMenu(View view) {
         PopupMenu popup = new PopupMenu(this, view);
         popup.getMenuInflater().inflate(R.menu.group_list_menu, popup.getMenu());
@@ -102,6 +118,9 @@ public class GroupListActivity extends AppCompatActivity {
         popup.show();
     }
 
+    /**
+     * Esegue il logout e torna alla schermata di login.
+     */
     private void logout() {
         authViewModel.logout();
         Intent intent = new Intent(this, MainActivity.class);
@@ -109,6 +128,9 @@ public class GroupListActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
+    /**
+     * Configura l'adapter per visualizzare i gruppi dell'utente in tempo reale.
+     */
     private void setupAdapter() {
         FirebaseUser user = authViewModel.getCurrentUser();
         if (user == null) return;
@@ -124,6 +146,7 @@ public class GroupListActivity extends AppCompatActivity {
                 holder.owner.setText(getString(R.string.proprietario_label, model.getOwnerNickname()));
 
                 holder.itemView.setOnClickListener(v -> {
+                    // Apre la chat del gruppo selezionato
                     Intent intent = new Intent(GroupListActivity.this, ChatActivity.class);
                     intent.putExtra("groupId", model.getName());
                     intent.putExtra("groupName", model.getName());
@@ -141,6 +164,7 @@ public class GroupListActivity extends AppCompatActivity {
             @Override
             public void onDataChanged() {
                 super.onDataChanged();
+                // Mostra/nasconde il messaggio "Nessun gruppo"
                 txtNoGroups.setVisibility(getItemCount() == 0 ? View.VISIBLE : View.GONE);
             }
         };
@@ -148,6 +172,9 @@ public class GroupListActivity extends AppCompatActivity {
         recyclerView.setAdapter(adapter);
     }
 
+    /**
+     * Mostra il dialogo per inserire il nome del nuovo gruppo da creare.
+     */
     private void showCreateGroupDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.create_group_dialog_title);

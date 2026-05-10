@@ -11,6 +11,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import android.util.Log;
+
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
@@ -29,6 +31,7 @@ import com.google.firebase.auth.FirebaseUser;
 
 import java.text.SimpleDateFormat;
 import java.util.Locale;
+import java.util.Objects;
 
 import model.ChatMessage;
 import viewmodel.AuthViewModel;
@@ -125,11 +128,9 @@ public class ChatActivity extends AppCompatActivity {
         View btnSend = findViewById(R.id.btnSendMessage);
         View btnAttach = findViewById(R.id.btnAttach);
         layoutInput = findViewById(R.id.layoutInput);
-        
-        /**
-         * Monitora lo stato del gruppo in tempo reale.
-         * Gestisce espulsioni, blocchi chat ed eliminazione del gruppo istantaneamente.
-         */
+
+        // Monitora lo stato del gruppo in tempo reale.
+        // Gestisce espulsioni, blocchi chat ed eliminazione del gruppo istantaneamente.
         groupViewModel.getCurrentGroup().observe(this, group -> {
             if (group == null) {
                 Toast.makeText(this, R.string.msg_group_not_found, Toast.LENGTH_SHORT).show();
@@ -137,7 +138,10 @@ public class ChatActivity extends AppCompatActivity {
                 return;
             }
 
+            // Verifichiamo se il proprietario è cambiato per decidere se aggiornare la lista (badge)
+            boolean ownerChanged = !Objects.equals(groupOwnerId, group.getOwnerId());
             groupOwnerId = group.getOwnerId();
+
             FirebaseUser user = authViewModel.getCurrentUser();
             if (user != null) {
                 // Se l'utente non è più nei 'members', chiude la chat
@@ -153,10 +157,13 @@ public class ChatActivity extends AppCompatActivity {
                 boolean isGroupLocked = group.isLocked();
                 layoutInput.setVisibility((isBlocked || isGroupLocked) ? View.GONE : View.VISIBLE);
             }
-            if (adapter != null) adapter.notifyDataSetChanged();
+            // Aggiorna l'adapter solo se il proprietario è cambiato, usando post() per sicurezza
+            if (adapter != null && ownerChanged) {
+                recyclerView.post(adapter::notifyDataSetChanged);
+            }
         });
 
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerView.setLayoutManager(new WrapContentLinearLayoutManager(this));
         setupAdapter(recyclerView);
 
         btnSend.setOnClickListener(v -> {
@@ -198,7 +205,7 @@ public class ChatActivity extends AppCompatActivity {
                 boolean isSameAsPrevious = false;
                 if (position > 0) {
                     ChatMessage previousMessage = getItem(position - 1);
-                    if (previousMessage.getSenderId() != null && previousMessage.getSenderId().equals(model.getSenderId())) {
+                    if (Objects.equals(previousMessage.getSenderId(), model.getSenderId())) {
                         isSameAsPrevious = true;
                     }
                 }
@@ -208,7 +215,7 @@ public class ChatActivity extends AppCompatActivity {
                 } else {
                     holder.layoutSenderInfo.setVisibility(View.VISIBLE);
                     holder.txtSender.setText(model.getSenderName());
-                    holder.txtOwnerBadge.setVisibility((model.getSenderId() != null && model.getSenderId().equals(groupOwnerId)) ? View.VISIBLE : View.GONE);
+                    holder.txtOwnerBadge.setVisibility(Objects.equals(model.getSenderId(), groupOwnerId) ? View.VISIBLE : View.GONE);
                 }
                 
                 // Visualizzazione differenziata tra testo e immagine (uso di Glide per il caricamento remoto)
@@ -242,14 +249,19 @@ public class ChatActivity extends AppCompatActivity {
             public int getItemViewType(int position) {
                 ChatMessage msg = getItem(position);
                 FirebaseUser currentUser = authViewModel.getCurrentUser();
-                return (currentUser != null && msg.getSenderId() != null && msg.getSenderId().equals(currentUser.getUid())) ? VIEW_TYPE_SENT : VIEW_TYPE_RECEIVED;
+                return (currentUser != null && Objects.equals(msg.getSenderId(), currentUser.getUid())) ? VIEW_TYPE_SENT : VIEW_TYPE_RECEIVED;
             }
             
             @Override
             public void onDataChanged() {
                 super.onDataChanged();
                 // Scroll automatico in fondo alla lista alla ricezione di nuovi messaggi
-                recyclerView.smoothScrollToPosition(getItemCount() > 0 ? getItemCount() - 1 : 0);
+                // Usiamo post per evitare inconsistenza durante il calcolo del layout
+                recyclerView.post(() -> {
+                    if (getItemCount() > 0) {
+                        recyclerView.smoothScrollToPosition(getItemCount() - 1);
+                    }
+                });
             }
         };
 
@@ -290,6 +302,25 @@ public class ChatActivity extends AppCompatActivity {
             txtTime = itemView.findViewById(R.id.txtMsgTime);
             imgPhoto = itemView.findViewById(R.id.imgMsgPhoto);
             layoutSenderInfo = itemView.findViewById(R.id.layoutSenderInfo);
+        }
+    }
+
+    /**
+     * LinearLayoutManager personalizzato per catturare l'eccezione IndexOutOfBoundsException
+     * che può verificarsi con RecyclerView in caso di inconsistenza dei dati.
+     */
+    private static class WrapContentLinearLayoutManager extends LinearLayoutManager {
+        public WrapContentLinearLayoutManager(android.content.Context context) {
+            super(context);
+        }
+
+        @Override
+        public void onLayoutChildren(RecyclerView.Recycler recycler, RecyclerView.State state) {
+            try {
+                super.onLayoutChildren(recycler, state);
+            } catch (IndexOutOfBoundsException e) {
+                Log.e("RecyclerView", "Inconsistency detected in onLayoutChildren");
+            }
         }
     }
 }

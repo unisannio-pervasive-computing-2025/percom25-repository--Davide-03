@@ -34,6 +34,10 @@ import model.User;
 import viewmodel.AuthViewModel;
 import viewmodel.GroupViewModel;
 
+/**
+ * Activity che visualizza i dettagli di un gruppo, inclusa la lista dei membri.
+ * Permette al proprietario di gestire i partecipanti (aggiunta, rimozione, blocco).
+ */
 public class GroupDetailsActivity extends AppCompatActivity {
 
     private GroupViewModel groupViewModel;
@@ -48,35 +52,41 @@ public class GroupDetailsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_group_details);
 
+        // Recupero dei parametri passati dall'activity precedente (ChatActivity)
         groupId = getIntent().getStringExtra("groupId");
+        
         groupViewModel = new ViewModelProvider(this).get(GroupViewModel.class);
         authViewModel = new ViewModelProvider(this).get(AuthViewModel.class);
 
+        // Configurazione Toolbar con tasto "Indietro"
         Toolbar toolbar = findViewById(R.id.detailsToolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
-        toolbar.setNavigationOnClickListener(v -> finish());
 
         EditText editEmail = findViewById(R.id.editMemberEmail);
         Button btnAdd = findViewById(R.id.btnAddMember);
         View layoutAddMember = findViewById(R.id.layoutAddMember);
         RecyclerView recyclerView = findViewById(R.id.recyclerMembers);
 
+        // Configurazione RecyclerView per la lista dei membri
         recyclerView.setLayoutManager(new LinearLayoutManager(this) {
             @Override
             public void onLayoutChildren(RecyclerView.Recycler recycler, RecyclerView.State state) {
                 try {
                     super.onLayoutChildren(recycler, state);
                 } catch (IndexOutOfBoundsException e) {
-                    // Previene il crash "Inconsistency detected"
+                    // Previene crash rari di inconsistenza del layout
                 }
             }
         });
         adapter = new MemberAdapter(new ArrayList<>());
         recyclerView.setAdapter(adapter);
 
+        /**
+         * Osserva lo stato delle azioni effettuate (aggiunta membri, eliminazione gruppo, ecc.)
+         */
         groupViewModel.getActionStatus().observe(this, status -> {
             if ("SUCCESS".equals(status)) {
                 Toast.makeText(this, R.string.msg_member_added, Toast.LENGTH_SHORT).show();
@@ -89,24 +99,23 @@ public class GroupDetailsActivity extends AppCompatActivity {
                 Toast.makeText(this, R.string.err_user_not_found, Toast.LENGTH_LONG).show();
             } else if ("DELETE_SUCCESS".equals(status)) {
                 Toast.makeText(this, R.string.msg_group_deleted, Toast.LENGTH_SHORT).show();
-                // Torniamo alla lista dei gruppi e puliamo lo stack in modo aggressivo
-                Intent intent = new Intent(this, GroupListActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                startActivity(intent);
-                finish();
+                // Gruppo eliminato: torna alla lista gruppi e pulisce lo stack
+                tornaAllaListaGruppi();
             } else if ("LEAVE_SUCCESS".equals(status)) {
                 Toast.makeText(this, R.string.msg_leave_success, Toast.LENGTH_SHORT).show();
-                Intent intent = new Intent(this, GroupListActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                startActivity(intent);
-                finish();
+                // Abbandono successo: torna alla lista gruppi
+                tornaAllaListaGruppi();
             } else if (status != null) {
                 Toast.makeText(this, status, Toast.LENGTH_SHORT).show();
             }
         });
 
+        // Aggiorna la lista membri quando i dati cambiano
         groupViewModel.getGroupMembers().observe(this, members -> adapter.updateMembers(members));
 
+        /**
+         * Monitora i dati del gruppo per gestire i permessi di visualizzazione (es. form aggiunta membro)
+         */
         groupViewModel.getCurrentGroup().observe(this, group -> {
             if (group != null) {
                 ownerId = group.getOwnerId();
@@ -114,16 +123,36 @@ public class GroupDetailsActivity extends AppCompatActivity {
                 
                 FirebaseUser currentUser = authViewModel.getCurrentUser();
                 boolean isOwner = currentUser != null && currentUser.getUid().equals(ownerId);
+                
+                // Solo il proprietario vede il campo per aggiungere membri
                 layoutAddMember.setVisibility(isOwner ? View.VISIBLE : View.GONE);
 
                 adapter.notifyDataSetChanged();
-                invalidateOptionsMenu();
+                invalidateOptionsMenu(); // Ricarica il menu per mostrare/nascondere "Elimina gruppo"
             }
         });
 
         btnAdd.setOnClickListener(v -> groupViewModel.addMember(groupId, editEmail.getText().toString()));
 
+        // Inizia il caricamento dei dettagli del gruppo
         groupViewModel.loadGroupDetails(groupId);
+    }
+
+    /**
+     * Metodo di utilità per tornare alla lista gruppi pulendo lo stack delle Activity.
+     */
+    private void tornaAllaListaGruppi() {
+        Intent intent = new Intent(this, GroupListActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        // Simula la pressione del tasto back di sistema per tornare all'Activity precedente (ChatActivity)
+        getOnBackPressedDispatcher().onBackPressed();
+        return true;
     }
 
     @Override
@@ -138,6 +167,7 @@ public class GroupDetailsActivity extends AppCompatActivity {
         if (deleteItem != null) {
             FirebaseUser currentUser = authViewModel.getCurrentUser();
             boolean isOwner = currentUser != null && currentUser.getUid().equals(ownerId);
+            // Solo il proprietario può vedere l'opzione per eliminare il gruppo
             deleteItem.setVisible(isOwner);
         }
         return super.onPrepareOptionsMenu(menu);
@@ -146,7 +176,7 @@ public class GroupDetailsActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
-            finish();
+            getOnBackPressedDispatcher().onBackPressed();
             return true;
         } else if (item.getItemId() == R.id.action_leave_group) {
             FirebaseUser user = authViewModel.getCurrentUser();
@@ -157,6 +187,7 @@ public class GroupDetailsActivity extends AppCompatActivity {
         } else if (item.getItemId() == R.id.action_delete_group) {
             Group group = groupViewModel.getCurrentGroup().getValue();
             if (group != null && group.getMembers() != null) {
+                // Il gruppo può essere eliminato solo se è rimasto solo il proprietario (o è vuoto)
                 if (group.getMembers().size() <= 1) {
                     groupViewModel.deleteGroup(groupId);
                 } else {
@@ -168,6 +199,9 @@ public class GroupDetailsActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
+    /**
+     * Mostra il menu contestuale per un singolo membro della lista.
+     */
     private void showMemberMenu(View view, User user) {
         PopupMenu popup = new PopupMenu(this, view);
         popup.getMenuInflater().inflate(R.menu.member_menu, popup.getMenu());
@@ -193,6 +227,9 @@ public class GroupDetailsActivity extends AppCompatActivity {
         popup.show();
     }
 
+    /**
+     * Adapter interno per gestire la visualizzazione dei membri nel RecyclerView.
+     */
     private class MemberAdapter extends RecyclerView.Adapter<MemberViewHolder> {
         private final List<User> members;
 
@@ -223,6 +260,7 @@ public class GroupDetailsActivity extends AppCompatActivity {
             boolean isCurrentUserOwner = currentUser != null && currentUser.getUid().equals(ownerId);
 
             if (user.getUid().equals(ownerId)) {
+                // Stile speciale per il proprietario
                 holder.ownerBadge.setVisibility(View.VISIBLE);
                 holder.ownerBadge.setText(R.string.owner_badge);
                 holder.btnMenu.setVisibility(View.GONE);
@@ -231,13 +269,16 @@ public class GroupDetailsActivity extends AppCompatActivity {
                 holder.email.setTextColor(ContextCompat.getColor(GroupDetailsActivity.this, R.color.white));
             } else {
                 holder.ownerBadge.setVisibility(View.GONE);
+                // Il menu di gestione membro è visibile solo al proprietario del gruppo
                 holder.btnMenu.setVisibility(isCurrentUserOwner ? View.VISIBLE : View.GONE);
                 
                 if (blockedMembers.contains(user.getUid())) {
+                    // Stile per utenti bloccati
                     holder.card.setCardBackgroundColor(ContextCompat.getColor(GroupDetailsActivity.this, R.color.blocked_red));
                     holder.nickname.setTextColor(ContextCompat.getColor(GroupDetailsActivity.this, R.color.blocked_text));
                     holder.email.setTextColor(ContextCompat.getColor(GroupDetailsActivity.this, R.color.blocked_text));
                 } else {
+                    // Stile standard
                     holder.card.setCardBackgroundColor(ContextCompat.getColor(GroupDetailsActivity.this, R.color.card_bg));
                     holder.nickname.setTextColor(ContextCompat.getColor(GroupDetailsActivity.this, R.color.text_main));
                     holder.email.setTextColor(ContextCompat.getColor(GroupDetailsActivity.this, R.color.text_secondary));
@@ -255,6 +296,9 @@ public class GroupDetailsActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * ViewHolder per la gestione degli elementi UI del singolo membro.
+     */
     private static class MemberViewHolder extends RecyclerView.ViewHolder {
         TextView nickname, email, ownerBadge;
         ImageButton btnMenu;
