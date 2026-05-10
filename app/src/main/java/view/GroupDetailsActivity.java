@@ -61,6 +61,7 @@ public class GroupDetailsActivity extends AppCompatActivity {
 
         EditText editEmail = findViewById(R.id.editMemberEmail);
         Button btnAdd = findViewById(R.id.btnAddMember);
+        View layoutAddMember = findViewById(R.id.layoutAddMember);
         RecyclerView recyclerView = findViewById(R.id.recyclerMembers);
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this) {
@@ -110,6 +111,11 @@ public class GroupDetailsActivity extends AppCompatActivity {
             if (group != null) {
                 ownerId = group.getOwnerId();
                 blockedMembers = group.getBlockedMembers() != null ? group.getBlockedMembers() : new ArrayList<>();
+                
+                FirebaseUser currentUser = authViewModel.getCurrentUser();
+                boolean isOwner = currentUser != null && currentUser.getUid().equals(ownerId);
+                layoutAddMember.setVisibility(isOwner ? View.VISIBLE : View.GONE);
+
                 adapter.notifyDataSetChanged();
                 invalidateOptionsMenu();
             }

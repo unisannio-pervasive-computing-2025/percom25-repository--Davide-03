@@ -2,7 +2,10 @@ package repository;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.WriteBatch;
 import model.User;
 import java.util.function.Consumer;
 
@@ -49,8 +52,8 @@ public class AuthRepository {
                 });
     }
 
-    public void listenToUserNickname(String uid, Consumer<String> callback) {
-        db.collection("users").document(uid)
+    public ListenerRegistration listenToUserNickname(String uid, Consumer<String> callback) {
+        return db.collection("users").document(uid)
                 .addSnapshotListener((documentSnapshot, e) -> {
                     if (documentSnapshot != null && documentSnapshot.exists()) {
                         callback.accept(documentSnapshot.getString("nickname"));
@@ -75,18 +78,16 @@ public class AuthRepository {
     }
 
     public void updateNickname(String uid, String newNickname, Consumer<String> callback) {
-        // 1. Aggiorna collezione users
         db.collection("users").document(uid).update("nickname", newNickname)
                 .addOnSuccessListener(aVoid -> {
-                    // 2. Aggiorna tutti i gruppi dove l'utente è proprietario
                     db.collection("groups").whereEqualTo("ownerId", uid).get()
                             .addOnSuccessListener(queryDocumentSnapshots -> {
                                 if (queryDocumentSnapshots.isEmpty()) {
                                     callback.accept("SUCCESS");
                                     return;
                                 }
-                                com.google.firebase.firestore.WriteBatch batch = db.batch();
-                                for (com.google.firebase.firestore.DocumentSnapshot doc : queryDocumentSnapshots) {
+                                WriteBatch batch = db.batch();
+                                for (DocumentSnapshot doc : queryDocumentSnapshots) {
                                     batch.update(doc.getReference(), "ownerNickname", newNickname);
                                 }
                                 batch.commit()

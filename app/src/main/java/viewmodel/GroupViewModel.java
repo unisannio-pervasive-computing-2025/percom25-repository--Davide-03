@@ -3,6 +3,7 @@ package viewmodel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import java.util.List;
 import model.Group;
@@ -11,9 +12,11 @@ import repository.GroupRepository;
 
 public class GroupViewModel extends ViewModel {
     private final GroupRepository repository = new GroupRepository();
-    private final MutableLiveData<String> actionStatus = new MutableLiveData<>();
+    private final SingleLiveEvent<String> actionStatus = new SingleLiveEvent<>();
     private final MutableLiveData<List<User>> groupMembers = new MutableLiveData<>();
     private final MutableLiveData<Group> currentGroup = new MutableLiveData<>();
+    private ListenerRegistration groupListener;
+    private String currentGroupId;
 
     public LiveData<String> getActionStatus() { return actionStatus; }
     public LiveData<List<User>> getGroupMembers() { return groupMembers; }
@@ -34,14 +37,18 @@ public class GroupViewModel extends ViewModel {
         }
         repository.addMember(groupId, email.trim(), status -> {
             actionStatus.setValue(status);
-            if ("SUCCESS".equals(status)) {
-                loadGroupDetails(groupId);
-            }
         });
     }
 
     public void loadGroupDetails(String groupId) {
-        repository.getGroup(groupId, group -> {
+        if (groupId != null && groupId.equals(currentGroupId) && groupListener != null) {
+            return;
+        }
+
+        if (groupListener != null) groupListener.remove();
+        currentGroupId = groupId;
+        
+        groupListener = repository.listenToGroup(groupId, group -> {
             currentGroup.setValue(group);
             if (group != null && group.getMembers() != null) {
                 repository.getUsersDetails(group.getMembers(), groupMembers::setValue);
@@ -49,11 +56,16 @@ public class GroupViewModel extends ViewModel {
         });
     }
 
+    @Override
+    protected void onCleared() {
+        super.onCleared();
+        if (groupListener != null) groupListener.remove();
+    }
+
     public void blockUser(String groupId, String userId, boolean block) {
         repository.blockUser(groupId, userId, block, status -> {
             if ("SUCCESS".equals(status)) {
                 actionStatus.setValue(block ? "Membro bloccato" : "Membro sbloccato");
-                loadGroupDetails(groupId);
             } else {
                 actionStatus.setValue(status);
             }
@@ -64,7 +76,6 @@ public class GroupViewModel extends ViewModel {
         repository.removeMember(groupId, userId, status -> {
             if ("SUCCESS".equals(status)) {
                 actionStatus.setValue("Membro rimosso");
-                loadGroupDetails(groupId);
             } else {
                 actionStatus.setValue(status);
             }

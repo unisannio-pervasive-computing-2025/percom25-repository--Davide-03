@@ -119,16 +119,27 @@ public class ChatActivity extends AppCompatActivity {
         layoutInput = findViewById(R.id.layoutInput);
         
         groupViewModel.getCurrentGroup().observe(this, group -> {
-            if (group != null) {
-                groupOwnerId = group.getOwnerId();
-                FirebaseUser user = authViewModel.getCurrentUser();
-                if (user != null) {
-                    boolean isBlocked = group.getBlockedMembers() != null && group.getBlockedMembers().contains(user.getUid());
-                    boolean isGroupLocked = group.isLocked();
-                    layoutInput.setVisibility((isBlocked || isGroupLocked) ? View.GONE : View.VISIBLE);
-                }
-                if (adapter != null) adapter.notifyDataSetChanged();
+            if (group == null) {
+                Toast.makeText(this, R.string.msg_group_not_found, Toast.LENGTH_SHORT).show();
+                finish();
+                return;
             }
+
+            groupOwnerId = group.getOwnerId();
+            FirebaseUser user = authViewModel.getCurrentUser();
+            if (user != null) {
+                boolean isMember = group.getMembers() != null && group.getMembers().contains(user.getUid());
+                if (!isMember) {
+                    Toast.makeText(this, R.string.msg_removed_from_group, Toast.LENGTH_SHORT).show();
+                    finish();
+                    return;
+                }
+
+                boolean isBlocked = group.getBlockedMembers() != null && group.getBlockedMembers().contains(user.getUid());
+                boolean isGroupLocked = group.isLocked();
+                layoutInput.setVisibility((isBlocked || isGroupLocked) ? View.GONE : View.VISIBLE);
+            }
+            if (adapter != null) adapter.notifyDataSetChanged();
         });
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this) {

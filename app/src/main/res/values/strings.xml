@@ -62,4 +62,7 @@
     <string name="err_unknown">Errore sconosciuto</string>
     <string name="msg_member_blocked_status">Membro bloccato</string>
     <string name="msg_member_unblocked_status">Membro sbloccato</string>
+    <string name="msg_group_not_found">Il gruppo non esiste più</string>
+    <string name="msg_removed_from_group">Sei stato rimosso dal gruppo</string>
+    <string name="err_send_failed">Impossibile inviare il messaggio</string>
 </resources>

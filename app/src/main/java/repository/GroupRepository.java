@@ -2,6 +2,7 @@ package repository;
 
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import model.Group;
 import model.User;
@@ -58,11 +59,14 @@ public class GroupRepository {
                 .addOnFailureListener(e -> callback.accept("ERR_SEARCH_FAILED"));
     }
 
-    public void getGroup(String groupId, Consumer<Group> callback) {
-        db.collection("groups").document(groupId).get()
-                .addOnSuccessListener(documentSnapshot -> {
-                    if (documentSnapshot.exists()) {
-                        callback.accept(documentSnapshot.toObject(Group.class));
+    public ListenerRegistration listenToGroup(String groupId, Consumer<Group> callback) {
+        return db.collection("groups").document(groupId)
+                .addSnapshotListener((snapshot, e) -> {
+                    if (e != null) return;
+                    if (snapshot != null && snapshot.exists()) {
+                        callback.accept(snapshot.toObject(Group.class));
+                    } else {
+                        callback.accept(null);
                     }
                 });
     }

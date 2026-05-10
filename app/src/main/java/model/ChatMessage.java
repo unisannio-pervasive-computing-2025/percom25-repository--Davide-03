@@ -7,7 +7,7 @@ public class ChatMessage {
     public static final String TYPE_TEXT = "TEXT";
     public static final String TYPE_IMAGE = "IMAGE";
 
-    private String sendegirId;
+    private String senderId;
     private String senderName;
     private String message;
     private String imageUrl;

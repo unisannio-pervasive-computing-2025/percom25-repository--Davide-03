@@ -14,19 +14,33 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 public class ChatRepository {
+    private static ChatRepository instance;
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final FirebaseStorage storage = FirebaseStorage.getInstance();
     private final ContentResolver contentResolver;
 
-    public ChatRepository(ContentResolver contentResolver) {
+    private ChatRepository(ContentResolver contentResolver) {
         this.contentResolver = contentResolver;
     }
 
-    public void sendMessage(String groupId, ChatMessage message) {
+    public static ChatRepository getInstance(ContentResolver contentResolver) {
+        if (instance == null) {
+            instance = new ChatRepository(contentResolver);
+        }
+        return instance;
+    }
+
+    public void sendMessage(String groupId, ChatMessage message, Consumer<Boolean> callback) {
         db.collection("groups")
                 .document(groupId)
                 .collection("messages")
-                .add(message);
+                .add(message)
+                .addOnSuccessListener(documentReference -> {
+                    if (callback != null) callback.accept(true);
+                })
+                .addOnFailureListener(e -> {
+                    if (callback != null) callback.accept(false);
+                });
     }
 
     public void uploadImage(Uri imageUri, Consumer<String> onSuccess, Consumer<String> onFailure) {

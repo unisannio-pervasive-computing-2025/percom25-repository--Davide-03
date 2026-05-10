@@ -4,12 +4,14 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.ListenerRegistration;
 import repository.AuthRepository;
 
 public class AuthViewModel extends ViewModel {
     private final AuthRepository repository = new AuthRepository();
-    private final MutableLiveData<String> authStatus = new MutableLiveData<>();
+    private final SingleLiveEvent<String> authStatus = new SingleLiveEvent<>();
     private final MutableLiveData<String> nickname = new MutableLiveData<>();
+    private ListenerRegistration nicknameListener;
 
     public LiveData<String> getAuthStatus() { return authStatus; }
     public LiveData<String> getNickname() { return nickname; }
@@ -38,7 +40,14 @@ public class AuthViewModel extends ViewModel {
     }
 
     public void fetchNickname(String uid) {
-        repository.listenToUserNickname(uid, nickname::setValue);
+        if (nicknameListener != null) nicknameListener.remove();
+        nicknameListener = repository.listenToUserNickname(uid, nickname::setValue);
+    }
+
+    @Override
+    protected void onCleared() {
+        super.onCleared();
+        if (nicknameListener != null) nicknameListener.remove();
     }
 
     public void updateNickname(String newNickname) {
