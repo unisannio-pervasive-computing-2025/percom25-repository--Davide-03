@@ -35,10 +35,14 @@ import viewmodel.AuthViewModel;
 import viewmodel.ChatViewModel;
 import viewmodel.GroupViewModel;
 
+/**
+ * Activity che gestisce la schermata della chat.
+ * Visualizza i messaggi in tempo reale e permette l'invio di testo ed immagini.
+ */
 public class ChatActivity extends AppCompatActivity {
 
-    private static final int VIEW_TYPE_SENT = 1;
-    private static final int VIEW_TYPE_RECEIVED = 2;
+    private static final int VIEW_TYPE_SENT = 1;      // Layout per messaggi inviati
+    private static final int VIEW_TYPE_RECEIVED = 2;  // Layout per messaggi ricevuti
 
     private ChatViewModel chatViewModel;
     private AuthViewModel authViewModel;
@@ -50,6 +54,9 @@ public class ChatActivity extends AppCompatActivity {
     private View layoutInput;
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
 
+    /**
+     * Gestisce la selezione di immagini dalla galleria dello smartphone.
+     */
     private final ActivityResultLauncher<String> mGetContent = registerForActivityResult(
             new ActivityResultContracts.GetContent(),
             uri -> {
@@ -59,6 +66,9 @@ public class ChatActivity extends AppCompatActivity {
             }
     );
 
+    /**
+     * Mostra un'anteprima dell'immagine selezionata prima di procedere all'invio.
+     */
     private void showImagePreviewDialog(Uri uri) {
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_image_preview, null);
         ImageView imgPreview = dialogView.findViewById(R.id.imgPreview);
@@ -90,6 +100,7 @@ public class ChatActivity extends AppCompatActivity {
         authViewModel = new ViewModelProvider(this).get(AuthViewModel.class);
         groupViewModel = new ViewModelProvider(this).get(GroupViewModel.class);
 
+        // Monitora il nickname per averlo pronto all'invio dei messaggi
         authViewModel.getNickname().observe(this, name -> latestNickname = name);
 
         FirebaseUser currentUser = authViewModel.getCurrentUser();
@@ -98,14 +109,11 @@ public class ChatActivity extends AppCompatActivity {
         }
 
         Toolbar toolbar = findViewById(R.id.chatToolbar);
-        if (groupName != null) {
-            toolbar.setTitle(groupName);
-        }
+        if (groupName != null) toolbar.setTitle(groupName);
         setSupportActionBar(toolbar);
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        }
+        if (getSupportActionBar() != null) getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
+        // Accesso ai dettagli del gruppo cliccando sul titolo nella toolbar
         toolbar.setOnClickListener(v -> {
             Intent intent = new Intent(ChatActivity.this, GroupDetailsActivity.class);
             intent.putExtra("groupId", groupId);
@@ -118,6 +126,10 @@ public class ChatActivity extends AppCompatActivity {
         View btnAttach = findViewById(R.id.btnAttach);
         layoutInput = findViewById(R.id.layoutInput);
         
+        /**
+         * Monitora lo stato del gruppo in tempo reale.
+         * Gestisce espulsioni, blocchi chat ed eliminazione del gruppo istantaneamente.
+         */
         groupViewModel.getCurrentGroup().observe(this, group -> {
             if (group == null) {
                 Toast.makeText(this, R.string.msg_group_not_found, Toast.LENGTH_SHORT).show();
@@ -128,6 +140,7 @@ public class ChatActivity extends AppCompatActivity {
             groupOwnerId = group.getOwnerId();
             FirebaseUser user = authViewModel.getCurrentUser();
             if (user != null) {
+                // Se l'utente non è più nei 'members', chiude la chat
                 boolean isMember = group.getMembers() != null && group.getMembers().contains(user.getUid());
                 if (!isMember) {
                     Toast.makeText(this, R.string.msg_removed_from_group, Toast.LENGTH_SHORT).show();
@@ -135,6 +148,7 @@ public class ChatActivity extends AppCompatActivity {
                     return;
                 }
 
+                // Se l'utente è bloccato, nasconde la barra di inserimento messaggi
                 boolean isBlocked = group.getBlockedMembers() != null && group.getBlockedMembers().contains(user.getUid());
                 boolean isGroupLocked = group.isLocked();
                 layoutInput.setVisibility((isBlocked || isGroupLocked) ? View.GONE : View.VISIBLE);
@@ -142,16 +156,7 @@ public class ChatActivity extends AppCompatActivity {
             if (adapter != null) adapter.notifyDataSetChanged();
         });
 
-        recyclerView.setLayoutManager(new LinearLayoutManager(this) {
-            @Override
-            public void onLayoutChildren(RecyclerView.Recycler recycler, RecyclerView.State state) {
-                try {
-                    super.onLayoutChildren(recycler, state);
-                } catch (IndexOutOfBoundsException e) {
-                    // Previene il crash "Inconsistency detected"
-                }
-            }
-        });
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
         setupAdapter(recyclerView);
 
         btnSend.setOnClickListener(v -> {
@@ -178,6 +183,9 @@ public class ChatActivity extends AppCompatActivity {
         groupViewModel.loadGroupDetails(groupId);
     }
 
+    /**
+     * Configura l'adapter per visualizzare i messaggi recuperati da Firestore in tempo reale.
+     */
     private void setupAdapter(RecyclerView recyclerView) {
         FirestoreRecyclerOptions<ChatMessage> options = new FirestoreRecyclerOptions.Builder<ChatMessage>()
                 .setQuery(chatViewModel.getMessagesQuery(groupId), ChatMessage.class)
@@ -186,6 +194,7 @@ public class ChatActivity extends AppCompatActivity {
         adapter = new FirestoreRecyclerAdapter<ChatMessage, MessageViewHolder>(options) {
             @Override
             protected void onBindViewHolder(@NonNull MessageViewHolder holder, int position, @NonNull ChatMessage model) {
+                // Logica estetica per non ripetere il nome se il mittente è lo stesso del messaggio precedente
                 boolean isSameAsPrevious = false;
                 if (position > 0) {
                     ChatMessage previousMessage = getItem(position - 1);
@@ -196,15 +205,13 @@ public class ChatActivity extends AppCompatActivity {
 
                 if (isSameAsPrevious) {
                     holder.layoutSenderInfo.setVisibility(View.GONE);
-                    holder.itemView.setPadding(holder.itemView.getPaddingLeft(), 0, holder.itemView.getPaddingRight(), holder.itemView.getPaddingBottom());
                 } else {
                     holder.layoutSenderInfo.setVisibility(View.VISIBLE);
                     holder.txtSender.setText(model.getSenderName());
-                    int topPadding = (int) (4 * getResources().getDisplayMetrics().density);
-                    holder.itemView.setPadding(holder.itemView.getPaddingLeft(), topPadding, holder.itemView.getPaddingRight(), holder.itemView.getPaddingBottom());
                     holder.txtOwnerBadge.setVisibility((model.getSenderId() != null && model.getSenderId().equals(groupOwnerId)) ? View.VISIBLE : View.GONE);
                 }
                 
+                // Visualizzazione differenziata tra testo e immagine (uso di Glide per il caricamento remoto)
                 if (ChatMessage.TYPE_IMAGE.equals(model.getType())) {
                     holder.txtMessage.setVisibility(View.GONE);
                     holder.imgPhoto.setVisibility(View.VISIBLE);
@@ -225,6 +232,7 @@ public class ChatActivity extends AppCompatActivity {
             @NonNull
             @Override
             public MessageViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+                // Sceglie il layout a destra (sent) o sinistra (received)
                 int layoutRes = (viewType == VIEW_TYPE_SENT) ? R.layout.item_message_sent : R.layout.item_message_received;
                 View view = LayoutInflater.from(parent.getContext()).inflate(layoutRes, parent, false);
                 return new MessageViewHolder(view);
@@ -240,6 +248,7 @@ public class ChatActivity extends AppCompatActivity {
             @Override
             public void onDataChanged() {
                 super.onDataChanged();
+                // Scroll automatico in fondo alla lista alla ricezione di nuovi messaggi
                 recyclerView.smoothScrollToPosition(getItemCount() > 0 ? getItemCount() - 1 : 0);
             }
         };
@@ -265,6 +274,9 @@ public class ChatActivity extends AppCompatActivity {
         if (adapter != null) adapter.stopListening();
     }
 
+    /**
+     * ViewHolder per la gestione grafica di un singolo messaggio nella lista.
+     */
     public static class MessageViewHolder extends RecyclerView.ViewHolder {
         TextView txtMessage, txtSender, txtOwnerBadge, txtTime;
         ImageView imgPhoto;

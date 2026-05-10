@@ -11,30 +11,30 @@ import androidx.lifecycle.Observer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * A lifecycle-aware observable that sends only new updates after subscription, used for events like
- * navigation and Toast messages.
- * <p>
- * This avoids a common problem with events: on configuration change (like rotation) an update
- * can be emitted if the observer is active. This LiveData only calls the observable if there's an
- * explicit call to setValue() or postValue().
- * <p>
- * Note that only one observer is going to be notified of changes.
+ * Un osservabile sensibile al ciclo di vita che invia aggiornamenti solo dopo la sottoscrizione.
+ * Viene utilizzato per eventi "una tantum" come la navigazione o i messaggi Toast.
+ * 
+ * Risolve il problema comune in cui gli eventi vengono riemessi durante un cambio
+ * di configurazione (es. rotazione dello schermo). Questo LiveData chiama l'osservatore
+ * solo se c'è stata una chiamata esplicita a setValue() o postValue().
  */
 public class SingleLiveEvent<T> extends MutableLiveData<T> {
 
     private static final String TAG = "SingleLiveEvent";
 
+    // AtomicBoolean garantisce che il valore venga consumato una sola volta in modo sicuro
     private final AtomicBoolean mPending = new AtomicBoolean(false);
 
     @MainThread
     public void observe(@NonNull LifecycleOwner owner, @NonNull final Observer<? super T> observer) {
 
         if (hasActiveObservers()) {
-            Log.w(TAG, "Multiple observers registered but only one will be notified of changes.");
+            Log.w(TAG, "Sono stati registrati più osservatori, ma solo uno riceverà le notifiche dei cambiamenti.");
         }
 
-        // Observe the internal MutableLiveData
+        // Osserva il MutableLiveData interno
         super.observe(owner, t -> {
+            // Se c'è un evento in sospeso, lo consumiamo e notifichiamo l'osservatore
             if (mPending.compareAndSet(true, false)) {
                 observer.onChanged(t);
             }
@@ -44,12 +44,13 @@ public class SingleLiveEvent<T> extends MutableLiveData<T> {
     @MainThread
     @Override
     public void setValue(@Nullable T t) {
+        // Segnala che c'è un nuovo valore da consumare
         mPending.set(true);
         super.setValue(t);
     }
 
     /**
-     * Used to clear the completed event value, for example after a navigation.
+     * Comodo per eventi senza dati (void).
      */
     @MainThread
     public void call() {

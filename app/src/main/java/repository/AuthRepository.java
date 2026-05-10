@@ -9,10 +9,17 @@ import com.google.firebase.firestore.WriteBatch;
 import model.User;
 import java.util.function.Consumer;
 
+/**
+ * Repository che gestisce le operazioni di autenticazione e i dati del profilo utente su Firebase.
+ * Funge da intermediario tra le sorgenti dati (Auth e Firestore) e il ViewModel.
+ */
 public class AuthRepository {
     private final FirebaseAuth mAuth = FirebaseAuth.getInstance();
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
 
+    /**
+     * Esegue il login con email e password. Notifica l'esito tramite callback.
+     */
     public void login(String email, String password, Consumer<String> callback) {
         mAuth.signInWithEmailAndPassword(email, password)
                 .addOnCompleteListener(task -> {
@@ -30,6 +37,9 @@ public class AuthRepository {
                 });
     }
 
+    /**
+     * Registra un nuovo utente su Firebase Auth e crea il relativo documento profilo su Firestore.
+     */
     public void register(String email, String password, String nickname, Consumer<String> callback) {
         mAuth.createUserWithEmailAndPassword(email, password)
                 .addOnCompleteListener(task -> {
@@ -52,6 +62,9 @@ public class AuthRepository {
                 });
     }
 
+    /**
+     * Attiva un ascolto in tempo reale (SnapshotListener) per monitorare i cambiamenti del nickname.
+     */
     public ListenerRegistration listenToUserNickname(String uid, Consumer<String> callback) {
         return db.collection("users").document(uid)
                 .addSnapshotListener((documentSnapshot, e) -> {
@@ -63,6 +76,9 @@ public class AuthRepository {
                 });
     }
 
+    /**
+     * Verifica se il documento dell'utente esiste ancora nel database Firestore.
+     */
     public void checkUserExists(String uid, Consumer<Boolean> callback) {
         db.collection("users").document(uid).get()
                 .addOnSuccessListener(documentSnapshot -> callback.accept(documentSnapshot.exists()))
@@ -77,9 +93,14 @@ public class AuthRepository {
         mAuth.signOut();
     }
 
+    /**
+     * Aggiorna il nickname dell'utente. Utilizza un WriteBatch per garantire che l'aggiornamento
+     * avvenga sia nel profilo che nei gruppi di cui l'utente è proprietario in modo atomico.
+     */
     public void updateNickname(String uid, String newNickname, Consumer<String> callback) {
         db.collection("users").document(uid).update("nickname", newNickname)
                 .addOnSuccessListener(aVoid -> {
+                    // Cerca tutti i gruppi posseduti dall'utente per aggiornare il campo ownerNickname
                     db.collection("groups").whereEqualTo("ownerId", uid).get()
                             .addOnSuccessListener(queryDocumentSnapshots -> {
                                 if (queryDocumentSnapshots.isEmpty()) {

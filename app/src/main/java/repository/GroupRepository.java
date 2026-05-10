@@ -10,9 +10,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
+/**
+ * Repository per la gestione dei gruppi, dei partecipanti e della moderazione.
+ * Centralizza la logica relativa ai gruppi su Firestore, separandola dai ViewModel.
+ */
 public class GroupRepository {
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
 
+    /**
+     * Crea un nuovo gruppo se il nome (che funge da ID documento) non è già occupato.
+     */
     public void createGroup(String groupName, String ownerId, String ownerNickname, Consumer<String> callback) {
         db.collection("groups").document(groupName).get()
                 .addOnSuccessListener(documentSnapshot -> {
@@ -30,10 +37,16 @@ public class GroupRepository {
                 .addOnFailureListener(e -> callback.accept("ERR_VERIFY_FAILED"));
     }
 
+    /**
+     * Ritorna la query per trovare tutti i gruppi in cui l'utente corrente è membro.
+     */
     public Query getGroupsForUserQuery(String userId) {
         return db.collection("groups").whereArrayContains("members", userId);
     }
 
+    /**
+     * Cerca un utente tramite email e lo aggiunge alla lista 'members' del gruppo.
+     */
     public void addMember(String groupId, String memberEmail, Consumer<String> callback) {
         db.collection("users").whereEqualTo("email", memberEmail).get()
                 .addOnSuccessListener(queryDocumentSnapshots -> {
@@ -59,6 +72,9 @@ public class GroupRepository {
                 .addOnFailureListener(e -> callback.accept("ERR_SEARCH_FAILED"));
     }
 
+    /**
+     * Attiva un listener per ricevere aggiornamenti in tempo reale sul documento del gruppo.
+     */
     public ListenerRegistration listenToGroup(String groupId, Consumer<Group> callback) {
         return db.collection("groups").document(groupId)
                 .addSnapshotListener((snapshot, e) -> {
@@ -66,11 +82,14 @@ public class GroupRepository {
                     if (snapshot != null && snapshot.exists()) {
                         callback.accept(snapshot.toObject(Group.class));
                     } else {
-                        callback.accept(null);
+                        callback.accept(null); // Documento eliminato
                     }
                 });
     }
 
+    /**
+     * Recupera i dettagli (nickname, email) di una lista di UID utente tramite l'operatore 'whereIn'.
+     */
     public void getUsersDetails(List<String> userIds, Consumer<List<User>> callback) {
         if (userIds == null || userIds.isEmpty()) {
             callback.accept(new ArrayList<>());
@@ -80,6 +99,9 @@ public class GroupRepository {
                 .addOnSuccessListener(queryDocumentSnapshots -> callback.accept(queryDocumentSnapshots.toObjects(User.class)));
     }
 
+    /**
+     * Aggiunge o rimuove un UID dall'array 'blockedMembers' per gestire i permessi di scrittura.
+     */
     public void blockUser(String groupId, String userId, boolean block, Consumer<String> callback) {
         db.collection("groups").document(groupId)
                 .update("blockedMembers", block ? FieldValue.arrayUnion(userId) : FieldValue.arrayRemove(userId))
@@ -87,6 +109,9 @@ public class GroupRepository {
                 .addOnFailureListener(e -> callback.accept("Errore: " + e.getMessage()));
     }
 
+    /**
+     * Rimuove un utente sia dalla lista membri che dalla lista bloccati.
+     */
     public void removeMember(String groupId, String userId, Consumer<String> callback) {
         db.collection("groups").document(groupId)
                 .update("members", FieldValue.arrayRemove(userId), "blockedMembers", FieldValue.arrayRemove(userId))
@@ -94,12 +119,19 @@ public class GroupRepository {
                 .addOnFailureListener(e -> callback.accept("Errore: " + e.getMessage()));
     }
 
+    /**
+     * Elimina definitivamente il documento del gruppo.
+     */
     public void deleteGroup(String groupId, Consumer<String> callback) {
         db.collection("groups").document(groupId).delete()
                 .addOnSuccessListener(aVoid -> callback.accept("DELETE_SUCCESS"))
                 .addOnFailureListener(e -> callback.accept("Errore: " + e.getMessage()));
     }
 
+    /**
+     * Gestisce l'abbandono di un utente. Include logica per l'auto-eliminazione del gruppo se vuoto
+     * e per il passaggio casuale della proprietà se a uscire è il proprietario.
+     */
     public void leaveGroup(String groupId, String userId, Consumer<String> callback) {
         db.collection("groups").document(groupId).get()
                 .addOnSuccessListener(doc -> {
@@ -116,7 +148,7 @@ public class GroupRepository {
                     if (members.isEmpty()) {
                         deleteGroup(groupId, status -> callback.accept("LEAVE_SUCCESS"));
                     } else if (userId.equals(group.getOwnerId())) {
-                        // Il proprietario sta uscendo, scegliamo un nuovo proprietario a caso
+                        // Passaggio proprietà casuale a un membro rimanente
                         String newOwnerId = members.get(new java.util.Random().nextInt(members.size()));
                         db.collection("users").document(newOwnerId).get()
                                 .addOnSuccessListener(userDoc -> {
@@ -132,7 +164,7 @@ public class GroupRepository {
                                             .addOnFailureListener(e -> callback.accept("Errore: " + e.getMessage()));
                                 });
                     } else {
-                        // Esce un membro normale
+                        // Uscita di un membro non proprietario
                         db.collection("groups").document(groupId)
                                 .update("members", members, "blockedMembers", group.getBlockedMembers())
                                 .addOnSuccessListener(aVoid -> callback.accept("LEAVE_SUCCESS"))
